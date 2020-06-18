@@ -25,7 +25,7 @@ const UserProductsScreen = props => {
         ])
     };
 
-    if(userProducts.length === 0) {
+    if(userProduct.length === 0) {
         return (
             <View>
                 <Text>No product found, maybe start creating some?</Text>

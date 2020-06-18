@@ -5,13 +5,15 @@ import { AsyncStorage } from 'react-native';
 export const AUTHENTICATE = 'AUTHENTICATE';
 export const LOGOUT = 'LOGOUT';
 
-export const authenticate = (userId, token) => {
-    return {
-        type: AUTHENTICATE,
-        userId: userId,
-        token: token
+let timer;
+
+export const authenticate = (userId, token, expiryTime) => {
+    return dispatch => {
+        dispatch(setLogoutTimer(expiryTime));
+        dispatch({ type: AUTHENTICATE, userId: userId, token: token});
     }
 }
+
 
 export const signup = (email, password) => {
     return async dispatch => {
@@ -41,7 +43,12 @@ export const signup = (email, password) => {
         
         const resData = await response.json();
         console.log(resData);
-        dispatch(authenticate(resData.localId, resData.idToken))
+        dispatch(
+            authenticate(
+              resData.localId, 
+              resData.idToken, 
+              parseInt(resData.expiresIn) * 1000
+            ))
         const expirationDate = new Date(
           new Date().getTime() + parseInt(resData.expiresIn) * 1000
         );
@@ -49,51 +56,64 @@ export const signup = (email, password) => {
     };
 };
 
-
 export const login = (email, password) => {
-    return async dispatch => {
-      const response = await fetch(
-        'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyBO8FrJUFWOHs2LN3olY1p7qDS_Ddbei_I',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            email: email,
-            password: password,
-            returnSecureToken: true
-          })
-        }
-      );
-  
-      if (!response.ok) {
-        const errorResData = await response.json();
-        const errorId = errorResData.error.message;
-        let message = 'Something went wrong!'
-        if(errorId === 'EMAIL_NOT_FOUND') {
-            message = 'This email could not be found!'
-        } else if (errorId === 'INVALID_PASSWORD') {
-            message = 'This Password is not valid!'
-        }
-        throw new Error(message);
+  return async dispatch => {
+    const response = await fetch(
+      'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyBO8FrJUFWOHs2LN3olY1p7qDS_Ddbei_I',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+          returnSecureToken: true
+        })
       }
-    
-      const resData = await response.json();
-      console.log(resData);
-      dispatch(authenticate(resData.localId, resData.idToken))
-      const expirationDate = new Date(
-          new Date().getTime() + parseInt(resData.expiresIn) * 1000
-        );
-      saveDataStorage(resData.idToken, resData.localId, expirationDate);
-    };
+    );
+
+    if (!response.ok) {
+      const errorResData = await response.json();
+      const errorId = errorResData.error.message;
+      let message = 'Something went wrong!'
+      if(errorId === 'EMAIL_NOT_FOUND') {
+          message = 'This email could not be found!'
+      } else if (errorId === 'INVALID_PASSWORD') {
+          message = 'This Password is not valid!'
+      }
+      throw new Error(message);
+    }
+  
+    const resData = await response.json();
+    dispatch(authenticate(resData.localId, resData.idToken, parseInt(resData.expiresIn) * 1000))
+    const expirationDate = new Date(
+        new Date().getTime() + parseInt(resData.expiresIn) * 1000
+      );
+    saveDataStorage(resData.idToken, resData.localId, expirationDate);
+  };
 };
 
 export const logout = () => {
-    return {
-        type: LOGOUT
+  clearLogoutTimer();
+  AsyncStorage.removeItem('userData');
+  return { type: LOGOUT };
+};
+
+const clearLogoutTimer = () => {
+    if(timer) {
+        clearTimeout(timer);
+    }
+};
+
+const setLogoutTimer = expirationTime => {
+    return dispatch => {
+        timer = setTimeout(() => {
+            dispatch(logout());
+        }, expirationTime);
     };
-}
+};
+
 
 const saveDataStorage = (token, userId, expirationDate) => {
     AsyncStorage.setItem('userData', JSON.stringify({

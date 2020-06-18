@@ -107,7 +107,7 @@ const AuthScreen = props => {
                     <Input 
                         id="email" 
                         label="E-Mail" 
-                        keyboardType="email-adress" 
+                        keyboardType="email-address" 
                         required 
                         email 
                         autoCapitalize="none"
